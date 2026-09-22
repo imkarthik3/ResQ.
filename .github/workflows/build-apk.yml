@@ -21,9 +21,9 @@ jobs:
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
-      - name: Install Android SDK
+      - name: Install Android SDK packages
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-35"
@@ -36,13 +36,22 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Check Android project
+        run: |
+          echo "Checking project files..."
+          ls -la
+          echo "App directory:"
+          ls -la app
+          echo "Android project detected."
+
       - name: Build Debug APK
         run: |
           gradle :app:assembleDebug --stacktrace
 
       - name: Find APK
         run: |
-          find app/build/outputs/apk -type f -name "*.apk" -print
+          echo "APK files:"
+          find app/build/outputs -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
