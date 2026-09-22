@@ -27,35 +27,92 @@ jobs:
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-35"
-          sdkmanager "platforms;android-36"
           sdkmanager "build-tools;35.0.0"
-          sdkmanager "build-tools;36.0.0"
+
+      - name: Find and extract Off-Grid SOS ZIP
+        run: |
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No ZIP file found"
+            exit 1
+          fi
+
+          echo "Found ZIP: $ZIP_FILE"
+
+          rm -rf extracted
+          mkdir -p extracted
+
+          unzip -o "$ZIP_FILE" -d extracted
+
+          echo "ZIP contents:"
+          find extracted -maxdepth 4 -type f | sort
+
+      - name: Locate Android project
+        run: |
+          set -e
+
+          SETTINGS_FILE=$(find extracted -type f \( \
+            -name "settings.gradle.kts" -o \
+            -name "settings.gradle" \
+          \) | head -n 1)
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ERROR: Android settings.gradle file not found"
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+
+          echo "Android project found at:"
+          echo "$PROJECT_DIR"
+
+          if [ ! -d "$PROJECT_DIR/app" ]; then
+            echo "ERROR: app directory not found"
+            exit 1
+          fi
+
+          if ! find "$PROJECT_DIR/app/src/main" -type f \
+            \( -name "MainActivity.kt" -o -name "MainActivity.java" \) \
+            | grep -q .; then
+            echo "ERROR: MainActivity not found"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Show project structure
+        run: |
+          echo "Building project:"
+          echo "$PROJECT_DIR"
+
+          echo "Main files:"
+          find "$PROJECT_DIR/app/src/main" -maxdepth 6 -type f | sort
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Check Android project
-        run: |
-          echo "Checking project files..."
-          ls -la
-          echo "App directory:"
-          ls -la app
-          echo "Android project detected."
-
       - name: Build Debug APK
         run: |
+          set -e
+
+          cd "$PROJECT_DIR"
+
           gradle :app:assembleDebug --stacktrace
 
       - name: Find APK
         run: |
-          echo "APK files:"
-          find app/build/outputs -type f -name "*.apk" -print
+          echo "Generated APK files:"
+          find "$PROJECT_DIR/app/build/outputs" \
+            -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: off-grid-sos-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
