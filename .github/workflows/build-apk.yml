@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Off-Grid SOS APK
 
 on:
   workflow_dispatch:
@@ -20,22 +20,33 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager "platform-tools"
+          sdkmanager "platforms;android-35"
+          sdkmanager "platforms;android-36"
+          sdkmanager "build-tools;35.0.0"
+          sdkmanager "build-tools;36.0.0"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Extract app source from ZIP
-        run: |
-          unzip -o OffGridMeshSOS.zip -d extracted
-          mkdir -p app/src/main/java/com/offgrid/mesh
-          cp extracted/OffGridMeshSOS/app/src/main/java/com/offgrid/mesh/*.kt app/src/main/java/com/offgrid/mesh/
-
       - name: Build Debug APK
-        run: gradle assembleDebug
+        run: |
+          gradle :app:assembleDebug --stacktrace
+
+      - name: Find APK
+        run: |
+          find app/build/outputs/apk -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: OffGridMeshSOS-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: off-grid-sos-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
